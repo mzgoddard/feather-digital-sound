@@ -1,3 +1,6 @@
 [submodule "lib/sam0"]
-	path = lib/sam0
+	path = src/deps/sam0
 	url = https://github.com/avrxml/sam0.git
+[submodule "lib/usb"]
+	path = src/deps/usb
+	url = https://github.com/kevinmehall/usb
