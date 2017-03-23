@@ -73,25 +73,8 @@ USB_ALIGN ring_buffer ring = {
         false,
         false,
     },
-    // .items = {
-    //     {
-    //         .ready = false,
-    //     },
-    //     {
-    //         .ready = false,
-    //     },
-    //     {
-    //         .ready = false,
-    //     },
-    //     {
-    //         .ready = false,
-    //     },
-    // },
 };
 USB_ALIGN ring_item ring_items[RING_SIZE];
-
-// UsbDeviceDescriptor usb_endpoints[] = {};
-// const uint8_t usb_num_endpoints = 0;
 
 // const USB_StringDescriptor msft_os = {
 //     .bLength = 18,
@@ -236,35 +219,6 @@ void fds_inout_completion(uint32_t summary) {
             fds_start_inout();
         }
     }
-    // if (summary & 1 << 1) {
-    //     if (summary & 1 << 2) {
-    //         fds_start_inout();
-    //     }
-    //     else {
-    //         if (!ring.input_hot) {
-    //             ring.input_hot = true;
-    //             fds_start_inout();
-    //         }
-    //         else {
-    //             ring.output_hot = false;
-    //         }
-    //     }
-    // }
-    // else {
-    //     if (summary & 1 << 2) {
-    //         if (!ring.output_hot) {
-    //             ring.output_hot = true;
-    //             fds_start_inout();
-    //         }
-    //     }
-    //     else {
-    //         if (!ring.output_hot && !ring.input_hot) {
-    //             ring.output_hot = true;
-    //             ring.input_hot = true;
-    //             fds_start_inout();
-    //         }
-    //     }
-    // }
 }
 
 void fds_out_completion(uint32_t summary) {
@@ -301,345 +255,6 @@ fds_completion_handle fds_usb_completion;
 
 /// Callback on a completion interrupt
 void usb_cb_completion(uint32_t summary) {
-    // led_on = 1;
-    // uint32_t summary = USB->DEVICE.EPINTSMRY.reg;
-
-    // led_on = summary > 1;
-
-    // fds_usb_completion(summary);
-
-    // if (summary & 1 << 1) {
-    //     ring.output_hot = false;
-    // }
-    // if (summary & 1 << 2) {
-    //     ring.input_hot = false;
-    // }
-    //
-    // if (ring.output_active) {
-    //     if (ring.input_active) {
-    //         if (!ring.output_hot && !ring.input_hot) {
-    //             ring.output_hot = true;
-    //             ring.input_hot = true;
-    //             usb_ep_start_in(INPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    //             ring.output_index = !ring.output_index;
-    //             usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //         }
-    //     }
-    //     else {
-    //         if (!ring.output_hot) {
-    //             ring.output_hot = true;
-    //             usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //         }
-    //     }
-    // }
-    // else if (ring.input_active) {
-    //     if (!ring.input_hot) {
-    //         ring.input_hot = true;
-    //         usb_ep_start_in(INPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    //     }
-    // }
-
-    // if (summary & (1 << 2)) {
-    //     // led_on = 1;
-    //
-    //     usb_ep_handled(INPUT_EP);
-    //
-    //     if (ring.input_active && ring.input_hot) {
-    //         ring.input_hot = false;
-    //
-    //         if (ring.output_active) {
-    //             ring_items[ring.input_index].ready = false;
-    //             ring.input_index = (ring.input_index + 1) % RING_SIZE;
-    //         }
-    //         else {
-    //             ring_items[ring.input_index].ready = true;
-    //             // memset(ring_items[ring.input_index].buffer, 0, MS_BUFFER_LENGTH);
-    //             // memset(ring_items[ring.input_index].buffer, 0xfff0, 96);
-    //             // memset(ring_items[ring.input_index].buffer + 96, 0x000f, 96);
-    //         }
-    //
-    //         // if (!ring.output_hot && ring.output_stalled && !ring_items[ring.output_index].ready) {
-    //         //     ring.output_hot = true;
-    //         //     ring.output_stalled = false;
-    //         //     usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //         // }
-    //
-    //         // if (ring_items[ring.input_index].ready) {
-    //         //     usb_ep_start_in(INPUT_EP, ring_items[ring.input_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    //         // }
-    //         // else {
-    //         //     // usb_set_stall_ep(INPUT_EP);
-    //         //     ring.input_stalled = true;
-    //         // }
-    //     }
-    // }
-    // if (summary & (1 << 1)) {
-    //     // led_on = usb_endpoints[1].DeviceDescBank[0].PCKSIZE.bit.BYTE_COUNT == MS_BUFFER_LENGTH;
-    //
-    //     usb_ep_handled(OUTPUT_EP);
-    //
-    //     if (ring.output_active && ring.output_hot) {
-    //         ring.output_hot = false;
-    //
-    //         if (ring.input_active) {
-    //             ring_items[ring.output_index].ready = true;
-    //             ring.output_index = (ring.output_index + 1) % RING_SIZE;
-    //             if (ring.input_available < 2) {
-    //                 ring.input_available += 1;
-    //             }
-    //         }
-    //
-    //         // if (ring.input_stalled && ring_items[ring.input_index].ready) {
-    //         //     ring.input_stalled = false;
-    //         //     usb_ep_start_in(INPUT_EP, ring_items[ring.input_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    //         // }
-    //
-    //         // if (!ring_items[ring.output_index].ready) {
-    //         //     ring.output_hot = true;
-    //         //     usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //         // }
-    //         // else {
-    //         //     // usb_set_stall_ep(OUTPUT_EP);
-    //         //     ring.output_stalled = true;
-    //         // }
-    //     }
-    //     if (!ring.input_hot && ring.output_active && !ring.output_hot) {
-    //         if (!ring_items[ring.output_index].ready) {
-    //             ring.output_hot = true;
-    //             usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //         }
-    //         else {
-    //             // usb_set_stall_ep(OUTPUT_EP);
-    //             ring.output_stalled = true;
-    //         }
-    //     }
-    // }
-    // if (summary & (1 << 2)) {
-    //     if (ring.output_active && !ring.output_hot) {
-    //         if (!ring_items[ring.output_index].ready) {
-    //             ring.output_hot = true;
-    //             usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //         }
-    //         else {
-    //             // usb_set_stall_ep(OUTPUT_EP);
-    //             ring.output_stalled = true;
-    //         }
-    //     }
-    // }
-
-    // bool out_complete = USB->DEVICE.DeviceEndpoint[1].EPINTFLAG.reg == USB_DEVICE_EPINTFLAG_TRCPT0;
-    // bool in_complete = USB->DEVICE.DeviceEndpoint[2].EPINTFLAG.reg == USB_DEVICE_EPINTFLAG_TRCPT1;
-
-    // if (ring.output_active) {
-    //     if (ring.input_active) {
-    //         if (summary & 1 << 1) {
-    //             if (summary & 1 << 2) {
-    //                 usb_ep_start_in(INPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    //                 ring.output_index = !ring.output_index;
-    //                 usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //             }
-    //             else {
-    //                 if (!ring.input_hot) {
-    //                     ring.input_hot = true;
-    //                     usb_ep_start_in(INPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    //                     ring.output_index = !ring.output_index;
-    //                     usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //                 }
-    //                 else {
-    //                     ring.output_hot = false;
-    //                 }
-    //             }
-    //         }
-    //         else {
-    //             if (summary & 1 << 2) {
-    //                 ring.input_hot = false;
-    //             }
-    //             if (!ring.output_hot && !ring.input_hot) {
-    //                 ring.output_hot = true;
-    //                 ring.input_hot = true;
-    //                 usb_ep_start_in(INPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    //                 ring.output_index = !ring.output_index;
-    //                 usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //             }
-    //         }
-    //     }
-    //     else {
-    //         if (summary & 1 << 1) {
-    //             ring.output_hot = false;
-    //         }
-    //         if (!ring.output_hot) {
-    //             ring.output_hot = true;
-    //             usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //         }
-    //     }
-    // }
-    // else if (ring.input_active) {
-    //     if (summary & 1 << 2) {
-    //         ring.input_hot = false;
-    //     }
-    //     if (!ring.output_hot && !ring.input_hot) {
-    //         ring.input_hot = true;
-    //         usb_ep_start_in(INPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    //     }
-    // }
-
-    // if (ring.output_active) {
-    //     if (ring.input_active) {
-    //         if (ring.output_hot) {
-    //             if (summary & 1 << 1) {
-    //                 ring.output_hot = false;
-    //                 ring.item_ready[ring.output_index] = true;
-    //                 ring.output_index = (ring.output_index + 1) & RING_MASK;
-    //
-    //                 if (ring.input_hot) {
-    //                     if (summary & 1 << 2) {
-    //                         ring.item_ready[ring.input_index] = false;
-    //                         ring.input_index = (ring.input_index + 1) & RING_MASK;
-    //
-    //                         if (!ring.item_ready[ring.output_index]) {
-    //                             ring.output_hot = true;
-    //                             usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //                         }
-    //                         if (ring.item_ready[ring.input_index]) {
-    //                             usb_ep_start_in(INPUT_EP, ring_items[ring.input_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    //                         }
-    //                         else {
-    //                             ring.input_hot = false;
-    //                         }
-    //                     }
-    //                     else {
-    //                         if (!ring.item_ready[ring.output_index]) {
-    //                             ring.output_hot = true;
-    //                             usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //                         }
-    //                         if (!ring.input_hot && ring.item_ready[ring.input_index]) {
-    //                             ring.input_hot = true;
-    //                             usb_ep_start_in(INPUT_EP, ring_items[ring.input_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    //                         }
-    //                     }
-    //                 }
-    //                 else {
-    //                     if (!ring.item_ready[ring.output_index]) {
-    //                         ring.output_hot = true;
-    //                         usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //                     }
-    //                     if (!ring.input_hot && ring.item_ready[ring.input_index]) {
-    //                         ring.input_hot = true;
-    //                         usb_ep_start_in(INPUT_EP, ring_items[ring.input_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    //                     }
-    //                 }
-    //             }
-    //             else {
-    //                 if (summary & 1 << 2 && ring.input_hot) {
-    //                     ring.input_hot = false;
-    //                     ring.item_ready[ring.input_index] = false;
-    //                     ring.input_index = (ring.input_index + 1) & RING_MASK;
-    //                 }
-    //                 if (!ring.item_ready[ring.output_index]) {
-    //                     ring.output_hot = true;
-    //                     usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //                 }
-    //                 if (!ring.input_hot && ring.item_ready[ring.input_index]) {
-    //                     ring.input_hot = true;
-    //                     usb_ep_start_in(INPUT_EP, ring_items[ring.input_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    //                 }
-    //             }
-    //         }
-    //         else {
-    //             if (summary & 1 << 2 && ring.input_hot) {
-    //                 ring.input_hot = false;
-    //                 ring.item_ready[ring.input_index] = false;
-    //                 ring.input_index = (ring.input_index + 1) & RING_MASK;
-    //             }
-    //             if (!ring.output_hot && !ring.item_ready[ring.output_index]) {
-    //                 ring.output_hot = true;
-    //                 usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //             }
-    //             if (!ring.input_hot && ring.item_ready[ring.input_index]) {
-    //                 ring.input_hot = true;
-    //                 usb_ep_start_in(INPUT_EP, ring_items[ring.input_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    //             }
-    //         }
-    //     }
-    //     else {
-    //         if (summary & 1 << 1 && ring.output_hot) {
-    //             ring.output_hot = false;
-    //         }
-    //         if (summary & 1 << 2 && ring.input_hot) {
-    //             ring.input_hot = false;
-    //             ring.item_ready[ring.input_index] = false;
-    //             ring.input_index = (ring.input_index + 1) & RING_MASK;
-    //         }
-    //         if (!ring.output_hot && !ring.item_ready[ring.output_index]) {
-    //             ring.output_hot = true;
-    //             usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //         }
-    //     }
-    // }
-    // else {
-    //     if (ring.input_active) {
-    //         if (summary & 1 << 1 && ring.output_hot) {
-    //             ring.output_hot = false;
-    //             ring.item_ready[ring.output_index] = true;
-    //             ring.output_index = (ring.output_index + 1) & RING_MASK;
-    //         }
-    //         if (summary & 1 << 2 && ring.input_hot) {
-    //             ring.input_hot = false;
-    //         }
-    //         if (!ring.input_hot && ring.item_ready[ring.input_index]) {
-    //             ring.input_hot = true;
-    //             usb_ep_start_in(INPUT_EP, ring_items[ring.input_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    //         }
-    //     }
-    //     else {
-    //         if (summary & 1 << 1 && ring.output_hot) {
-    //             ring.output_hot = false;
-    //         }
-    //         if (summary & 1 << 2 && ring.input_hot) {
-    //             ring.input_hot = false;
-    //         }
-    //     }
-    // }
-
-    // bool out_complete = summary & 1 << 1;
-    // bool in_complete = summary & 1 << 2;
-    //
-    // if (out_complete) {
-    //     if (ring.output_active && ring.output_hot) {
-    //         ring.output_hot = false;
-    //
-    //         if (ring.input_active) {
-    //             ring.item_ready[ring.output_index] = true;
-    //             ring.output_index = (ring.output_index + 1) & RING_MASK;
-    //         }
-    //     }
-    // }
-    //
-    // if (in_complete) {
-    //     // led_on = 1;
-    //     // usb_ep_handled(INPUT_EP);
-    //
-    //     if (ring.input_active && ring.input_hot) {
-    //         ring.input_hot = false;
-    //
-    //         if (ring.output_active) {
-    //             ring.item_ready[ring.input_index] = false;
-    //             ring.input_index = (ring.input_index + 1) & RING_MASK;
-    //         }
-    //     }
-    // }
-    //
-    // // if (ring.output_stalled)
-    // if (ring.output_active && !ring.output_hot && !ring.item_ready[ring.output_index]) {
-    //     ring.output_hot = true;
-    //     usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    // }
-    //
-    // // if (ring.input_stalled)
-    // if (ring.input_active && !ring.input_hot && ring.item_ready[ring.input_index]) {
-    //     ring.input_hot = true;
-    //     usb_ep_start_in(INPUT_EP, ring_items[ring.input_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    // }
 }
 void usb_cb_control_in_completion(void) {
 }
@@ -648,73 +263,7 @@ void usb_cb_control_out_completion(void) {
 
 /// Callback for a SET_CONFIGURATION request
 bool usb_cb_set_configuration(uint8_t config) {
-    // led_on = 1;
     return true;
-}
-
-void fds_tick(void) {
-    // uint32_t summary = (usb_ep_ready(1) ? (1 << 1) : 0) | (usb_ep_ready(2) ? (1 << 2) : 0);
-    //
-    // if (summary & (1 << 1)) {
-    //     // led_on = usb_endpoints[1].DeviceDescBank[0].PCKSIZE.bit.BYTE_COUNT == MS_BUFFER_LENGTH;
-    //     if (ring.output_active && ring.output_hot) {
-    //         ring.output_hot = false;
-    //
-    //         if (ring.input_active) {
-    //             ring_items[ring.output_index].ready = true;
-    //             ring.output_index = (ring.output_index + 1) % RING_SIZE;
-    //         }
-    //
-    //         // if (ring.input_stalled && ring_items[ring.input_index].ready) {
-    //         //     ring.input_stalled = false;
-    //         //     usb_ep_start_in(INPUT_EP, ring_items[ring.input_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    //         // }
-    //     }
-    //     if (ring.output_active && !ring.output_hot) {
-    //         if (!ring_items[ring.output_index].ready) {
-    //             ring.output_hot = true;
-    //             usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //         }
-    //         else {
-    //             // usb_set_stall_ep(OUTPUT_EP);
-    //             ring.output_stalled = true;
-    //         }
-    //     }
-    // }
-    // if (summary & (1 << 2)) {
-    //     // led_on = 1;
-    //
-    //     if (ring.input_active && ring.input_hot) {
-    //         ring.input_hot = false;
-    //
-    //         if (ring.output_active) {
-    //             ring_items[ring.input_index].ready = false;
-    //             ring.input_index = (ring.input_index + 1) % RING_SIZE;
-    //         }
-    //         else {
-    //             ring_items[ring.input_index].ready = true;
-    //             // memset(ring_items[ring.input_index].buffer, 0, MS_BUFFER_LENGTH);
-    //             // memset(ring_items[ring.input_index].buffer, 0xfff0, 96);
-    //             // memset(ring_items[ring.input_index].buffer + 96, 0x000f, 96);
-    //         }
-    //
-    //         // if (!ring.output_hot && ring.output_stalled && !ring_items[ring.output_index].ready) {
-    //         //     ring.output_hot = true;
-    //         //     ring.output_stalled = false;
-    //         //     usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //         // }
-    //     }
-    //     if (ring.input_active && !ring.input_hot) {
-    //         if (ring_items[ring.input_index].ready) {
-    //             // led_on = 1;
-    //             usb_ep_start_in(INPUT_EP, ring_items[ring.input_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    //         }
-    //         else {
-    //             // usb_set_stall_ep(INPUT_EP);
-    //             ring.input_stalled = true;
-    //         }
-    //     }
-    // }
 }
 
 void fds_output_init(void) {
@@ -736,7 +285,6 @@ void fds_output_init(void) {
         usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
     }
     else {
-        // usb_set_stall_ep(OUTPUT_EP);
         ring.output_stalled = true;
     }
 }
@@ -757,8 +305,6 @@ void fds_output_disable(void) {
 }
 
 void fds_input_init(void) {
-    // led_on = 1;
-
     usb_enable_ep(INPUT_EP, USB_EP_TYPE_ISOCHRONOUS, USB_EP2_SIZE);
 
     ring.input_active = true;
@@ -769,19 +315,6 @@ void fds_input_init(void) {
     else {
         fds_usb_completion = fds_in_completion;
     }
-
-    // if (!ring.output_active) {
-    //     ring_items[ring.input_index].ready = true;
-    //     memset(ring_items[ring.input_index].buffer, 0, MS_BUFFER_LENGTH);
-    // }
-    //
-    // if (ring_items[ring.input_index].ready) {
-    //     usb_ep_start_in(INPUT_EP, ring_items[ring.input_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    // }
-    // else {
-    //     // usb_set_stall_ep(INPUT_EP);
-    //     ring.input_stalled = true;
-    // }
 }
 
 void fds_input_disable(void) {
@@ -846,11 +379,6 @@ bool usb_cb_set_interface(uint16_t interface, uint16_t altsetting) {
     }
     return true;
 }
-
-// /// Callbck for a GET_DESCRIPTOR request
-// uint16_t usb_cb_get_descriptor(uint8_t type, uint8_t index, const uint8_t** descriptor_ptr) {
-//     return 0;
-// }
 
 inline static void pin_mux(uint8_t p, uint8_t mux) {
   if (p & 1) {
@@ -1012,13 +540,6 @@ void clock_init_crystal(u8 clk_system, u8 clk_32k) {
   while (GCLK->STATUS.bit.SYNCBUSY);
 }
 
-void init_systick() {
-	if (SysTick_Config(48000000 / 1000)) {	/* Setup SysTick Timer for 1 msec interrupts  */
-		while (1) {}								/* Capture error */
-	}
-	NVIC_SetPriority(SysTick_IRQn, 0x0);
-}
-
 #define GCLK_SYSTEM 0
 #define GCLK_32K    2
 
@@ -1028,7 +549,6 @@ void init_systick() {
 
 int main() {
     clock_init_crystal(GCLK_SYSTEM, GCLK_32K);
-    // init_systick();
 
     init();
 
@@ -1107,244 +627,16 @@ int main() {
     return 0;
 }
 
-
-// /* SysTick IRQ handler */
-// void SysTick_Handler(void) {
-//     if (ring.output_active) {
-//         if (ring.input_active) {
-//             usb_ep_start_in(INPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-//             ring.output_index = !ring.output_index;
-//             usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-//         }
-//         else {
-//             usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-//         }
-//     }
-//     else if (ring.input_active) {
-//         usb_ep_start_in(INPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-//     }
-// }
-
 void TCC0_Handler(void) {
     // led_on = !led_on;
     pin_set(LED_PIN, led_on % 1000 == 1);
 
     // Tcc *t0 = TCC0;
     TCC0->INTFLAG.reg = TCC_INTFLAG_OVF;
-
-    // led_on = ring.input_index == 0;
-    // led_on = 1;
-
-    // if (ring.output_active) {
-    //     if (ring.input_active) {
-    //         usb_ep_start_in(INPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    //         ring.output_index = !ring.output_index;
-    //         usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //     }
-    //     else {
-    //         usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    //     }
-    // }
-    // else if (ring.input_active) {
-    //     usb_ep_start_in(INPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    // }
-
-    // if (ring.output_active) {
-    //     ring.output_tick++;
-    // }
-    // if (ring.input_active) {
-    //     ring.input_tick++;
-    // }
-
-    // bool out_complete = usb_endpoints[1].DeviceDescBank[0].PCKSIZE.bit.BYTE_COUNT == MS_BUFFER_LENGTH;
-    // bool in_complete = // usb_endpoints[2].DeviceDescBank[1].PCKSIZE.bit.BYTE_COUNT == 0;
-//     bool out_complete = USB->DEVICE.DeviceEndpoint[1].EPINTFLAG.reg == USB_DEVICE_EPINTFLAG_TRCPT0;
-//     bool in_complete = USB->DEVICE.DeviceEndpoint[2].EPINTFLAG.reg == USB_DEVICE_EPINTFLAG_TRCPT1;
-    // bool out_complete = 1;
-    // bool in_complete = 1;
-    //
-    // led_on = in_complete;
-    //
-    // if (out_complete) {
-    //     // led_on = 1;
-    //     usb_ep_handled(OUTPUT_EP);
-    //
-    //     if (ring.output_active && ring.output_hot) {
-    //         ring.output_hot = false;
-    //
-    //         if (ring.input_active) {
-    //             ring_items[ring.output_index].ready = true;
-    //             ring.output_index = (ring.output_index + 1) % RING_SIZE;
-    //             if (ring.input_available < 2) {
-    //                 ring.input_available += 1;
-    //             }
-    //         }
-    //     }
-    // }
-    //
-    // if (in_complete) {
-    //     // led_on = 1;
-    //     usb_ep_handled(INPUT_EP);
-    //
-    //     if (ring.input_active && ring.input_hot) {
-    //         ring.input_hot = false;
-    //
-    //         if (ring.output_active) {
-    //             ring_items[ring.input_index].ready = false;
-    //             ring.input_index = (ring.input_index + 1) % RING_SIZE;
-    //         }
-    //     }
-    // }
-    //
-    // if (ring.output_active && !ring.output_hot && !ring_items[ring.output_index].ready) {
-    //     ring.output_hot = true;
-    //     ring.output_stalled = false;
-    //     usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    // }
-    // else {
-    //     // usb_set_stall_ep(OUTPUT_EP);
-    //     ring.output_stalled = true;
-    // }
-    //
-    // if (ring.input_active && !ring.input_hot && ring_items[ring.input_index].ready && ring.input_available > 1) {
-    //     // led_on = 1;
-    //     // ring.input_available -= 1;
-    //     ring.input_hot = true;
-    //     ring.input_stalled = false;
-    //     usb_ep_start_in(INPUT_EP, ring_items[ring.input_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    // }
-    // else {
-    //     // usb_set_stall_ep(INPUT_EP);
-    //     ring.input_stalled = true;
-    // }
 }
 
 void usb_cb_sof(void) {
     tick += 1;
-
-    // bool out_complete = 1;
-    // bool in_complete = 1;
-    //
-    // led_on = in_complete;
-    //
-    // if (out_complete) {
-    //     // led_on = 1;
-    //     usb_ep_handled(OUTPUT_EP);
-    //
-    //     if (ring.output_active && ring.output_hot) {
-    //         ring.output_hot = false;
-    //
-    //         if (ring.input_active) {
-    //             ring_items[ring.output_index].ready = true;
-    //             ring.output_index = (ring.output_index + 1) % RING_SIZE;
-    //             if (ring.input_available < 2) {
-    //                 ring.input_available += 1;
-    //             }
-    //         }
-    //     }
-    // }
-    //
-    // if (in_complete) {
-    //     // led_on = 1;
-    //     usb_ep_handled(INPUT_EP);
-    //
-    //     if (ring.input_active && ring.input_hot) {
-    //         ring.input_hot = false;
-    //
-    //         if (ring.output_active) {
-    //             ring_items[ring.input_index].ready = false;
-    //             ring.input_index = (ring.input_index + 1) % RING_SIZE;
-    //         }
-    //     }
-    // }
-    //
-    // if (ring.output_active && !ring.output_hot && !ring_items[ring.output_index].ready) {
-    //     ring.output_hot = true;
-    //     ring.output_stalled = false;
-    //     usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    // }
-    // else {
-    //     // usb_set_stall_ep(OUTPUT_EP);
-    //     ring.output_stalled = true;
-    // }
-    //
-    // if (ring.input_active && !ring.input_hot && ring_items[ring.input_index].ready && ring.input_available > 1) {
-    //     // led_on = 1;
-    //     // ring.input_available -= 1;
-    //     ring.input_hot = true;
-    //     ring.input_stalled = false;
-    //     usb_ep_start_in(INPUT_EP, ring_items[ring.input_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    // }
-    // else {
-    //     // usb_set_stall_ep(INPUT_EP);
-    //     ring.input_stalled = true;
-    // }
-
-    // bool out_complete = USB->DEVICE.DeviceEndpoint[1].EPINTFLAG.reg == USB_DEVICE_EPINTFLAG_TRCPT0;
-    // bool in_complete = USB->DEVICE.DeviceEndpoint[2].EPINTFLAG.reg == USB_DEVICE_EPINTFLAG_TRCPT1;
-    //
-    // led_on = in_complete;
-    //
-    // if (out_complete) {
-    //     // led_on = 1;
-    //     usb_ep_handled(OUTPUT_EP);
-    //
-    //     if (ring.output_active && ring.output_hot) {
-    //         ring.output_hot = false;
-    //
-    //         if (ring.input_active) {
-    //             ring_items[ring.output_index].ready = true;
-    //             ring.output_index = (ring.output_index + 1) % RING_SIZE;
-    //             if (ring.input_available < 2) {
-    //                 ring.input_available += 1;
-    //             }
-    //         }
-    //     }
-    // }
-    //
-    // if (in_complete) {
-    //     // led_on = 1;
-    //     usb_ep_handled(INPUT_EP);
-    //
-    //     if (ring.input_active && ring.input_hot) {
-    //         ring.input_hot = false;
-    //
-    //         if (ring.output_active) {
-    //             ring_items[ring.input_index].ready = false;
-    //             ring.input_index = (ring.input_index + 1) % RING_SIZE;
-    //         }
-    //     }
-    // }
-
-    // if (ring.output_active && !ring.output_hot && !ring_items[ring.output_index].ready) {
-    //     ring.output_hot = true;
-    //     ring.output_stalled = false;
-    //     ring.output_tick = tick;
-    //     usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    // }
-    // else {
-    //     // usb_set_stall_ep(OUTPUT_EP);
-    //     ring.output_stalled = true;
-    // }
-    //
-    // // led_on = usb_endpoints[1].DeviceDescBank[0].PCKSIZE.bit.BYTE_COUNT == MS_BUFFER_LENGTH;
-    // // led_on = !ring_items[ring.input_index].ready;
-    //
-    // if (ring.input_active && !ring.input_hot && ring_items[ring.input_index].ready && ring.input_available > 3) {
-    //     // ring.input_available -= 1;
-    //     ring.input_hot = true;
-    //     ring.input_stalled = false;
-    //     ring.input_tick = tick;
-    //     usb_ep_start_in(INPUT_EP, ring_items[ring.input_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-    // }
-    // else {
-    //     // usb_set_stall_ep(INPUT_EP);
-    //     ring.input_stalled = true;
-    // }
-
-    // led_on += 1;
-
-    // if (tick % 2 == 0)
 
     fds_usb_completion((ring.output_hot ? (1 << 1) : 0) | (ring.input_hot ? (1 << 2) : 0));
 }
