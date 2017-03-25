@@ -37,6 +37,9 @@ USB_ENDPOINTS(3);
 #define OUTPUT_EP 0x01
 #define INPUT_EP 0x82
 
+#define OUTPUT_RING_CH 0x01
+#define INPUT_RING_CH 0x02
+
 #define RING_SIZE 2
 #define RING_MASK (RING_SIZE - 1)
 #define MS_BUFFER_SIZE 192
@@ -50,34 +53,14 @@ typedef struct {
     uint8_t buffer[MS_BUFFER_SIZE];
 } __attribute__((packed)) ring_item;
 typedef struct {
-    uint8_t output_index;
-    bool output_stalled;
-    bool output_active;
-    bool output_hot;
-    uint16_t output_tick;
-    uint8_t input_available;
-    uint8_t input_index;
-    bool input_stalled;
-    bool input_active;
-    bool input_hot;
-    uint16_t input_tick;
-    bool item_ready[RING_SIZE];
-    // ring_item items[RING_SIZE];
+    uint8_t index;
+    uint8_t active;
+    uint8_t hot;
 } __attribute__((packed)) ring_buffer;
 USB_ALIGN ring_buffer ring = {
-    .output_index = 0,
-    .output_stalled = false,
-    .output_active = false,
-    .output_tick = 0,
-    .input_available = 0,
-    .input_index = 0,
-    .input_stalled = false,
-    .input_active = false,
-    .input_tick = 0,
-    .item_ready = {
-        false,
-        false,
-    },
+    .index = 0,
+    .active = 0,
+    .hot = 0,
 };
 USB_ALIGN ring_item ring_items[RING_SIZE];
 
@@ -174,53 +157,34 @@ void usb_cb_control_setup(void) {
 void fds_noop_completion(uint32_t summary) {}
 
 static inline void fds_start_inout() {
-    ring.input_index = ring.output_index;
-    ring.output_index = (ring.output_index + 1 & RING_MASK);
-    usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    usb_ep_start_in(INPUT_EP, ring_items[ring.input_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
+    uint8_t index = ring.index;
+    ring.index = ring.index + 1 & RING_MASK;
+    usb_ep_start_out(OUTPUT_EP, ring_items[ring.index].buffer, MS_BUFFER_LENGTH);
+    usb_ep_start_in(INPUT_EP, ring_items[index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
 }
 
 void fds_inout_completion(uint32_t summary) {
-    if (summary & 0x06) {
+    if (summary & (OUTPUT_RING_CH | INPUT_RING_CH)) {
         fds_start_inout();
     }
-    else if (summary & 0x02) {
-        // if (ring.hot & 0x02 == 0x00) {
-        //     ring.hot |= 0x02;
-        //     fds_start_inout();
-        // }
-        // else {
-        //     ring.hot &= ~0x01;
-        // }
-        if (!ring.input_hot) {
-            ring.input_hot = true;
+    else if (summary & OUTPUT_RING_CH) {
+        if (ring.hot & INPUT_RING_CH == 0x00) {
+            ring.hot |= INPUT_RING_CH;
             fds_start_inout();
         }
         else {
-            ring.output_hot = false;
+            ring.hot &= ~OUTPUT_RING_CH;
         }
     }
-    else if (summary & 0x04) {
-        // if (ring.hot & 0x01 == 0x00) {
-        //     ring.hot |= 0x01;
-        //     fds_start_inout();
-        // }
-        if (!ring.output_hot) {
-            ring.output_hot = true;
+    else if (summary & INPUT_RING_CH) {
+        if (ring.hot & OUTPUT_RING_CH == 0x00) {
+            ring.hot |= OUTPUT_RING_CH;
             fds_start_inout();
-        }
-        else {
-            ring.input_hot = false;
         }
     }
     else {
-        // if (ring.hot & 0x03 == 0x00) {
-        //     ring.hot |= 0x03;
-        //     fds_start_inout();
-        // }
-        if (!ring.output_hot && !ring.input_hot) {
-            ring.output_hot = true;
-            ring.input_hot = true;
+        if (ring.hot & (OUTPUT_RING_CH | INPUT_RING_CH) == 0x00) {
+            ring.hot |= (OUTPUT_RING_CH | INPUT_RING_CH);
             fds_start_inout();
         }
     }
@@ -228,35 +192,36 @@ void fds_inout_completion(uint32_t summary) {
 
 void fds_out_completion(uint32_t summary) {
     if (summary & 1 << 1) {
-        ring.output_hot = false;
+        ring.hot &= ~OUTPUT_RING_CH;
     }
     if (summary & 1 << 2) {
-        ring.input_hot = false;
+        ring.hot &= ~INPUT_RING_CH;
     }
 
-    if (!ring.output_hot) {
-        ring.output_hot = true;
-        usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
+    if (ring.hot & OUTPUT_RING_CH == 0x00) {
+        ring.hot |= OUTPUT_RING_CH;
+        usb_ep_start_out(OUTPUT_EP, ring_items[ring.index].buffer, MS_BUFFER_LENGTH);
     }
 }
 
 void fds_in_completion(uint32_t summary) {
     if (summary & 1 << 1) {
-        ring.output_hot = false;
+        ring.hot &= ~OUTPUT_RING_CH;
     }
     if (summary & 1 << 2) {
-        ring.input_hot = false;
+        ring.hot &= ~INPUT_RING_CH;
     }
 
-    if (!ring.input_hot) {
-        ring.input_hot = true;
-        usb_ep_start_in(INPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
+    if (ring.hot & INPUT_RING_CH == 0x00) {
+        ring.hot |= INPUT_RING_CH;
+        usb_ep_start_in(INPUT_EP, ring_items[ring.index].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
     }
 }
 
 typedef void (*fds_completion_handle)(uint32_t);
 
 fds_completion_handle fds_usb_completion;
+fds_completion_handle fds_completions[4];
 
 /// Callback on a completion interrupt
 void usb_cb_completion(uint32_t summary) {
@@ -274,77 +239,40 @@ bool usb_cb_set_configuration(uint8_t config) {
 void fds_output_init(void) {
     usb_enable_ep(OUTPUT_EP, USB_EP_TYPE_ISOCHRONOUS, USB_EP1_SIZE);
 
-    ring.output_active = true;
+    ring.active |= OUTPUT_RING_CH;
 
-    if (ring.input_active) {
-        fds_usb_completion = fds_inout_completion;
-    }
-    else {
-        fds_usb_completion = fds_out_completion;
-    }
+    fds_usb_completion = fds_completions[ring.active];
 
-    ring.output_index = ring.input_index;
+    ring.index = 0;
 
-    if (!ring.item_ready[ring.output_index]) {
-        ring.output_hot = true;
-        usb_ep_start_out(OUTPUT_EP, ring_items[ring.output_index].buffer, MS_BUFFER_LENGTH);
-    }
-    else {
-        ring.output_stalled = true;
-    }
+    ring.hot |= OUTPUT_RING_CH;
+    usb_ep_start_out(OUTPUT_EP, ring_items[ring.index].buffer, MS_BUFFER_LENGTH);
 }
 
 void fds_output_disable(void) {
     usb_disable_ep(OUTPUT_EP);
 
-    ring.output_hot = false;
-    ring.output_active = false;
-    ring.output_stalled = false;
+    ring.hot &= ~OUTPUT_RING_CH;
+    ring.active &= ~OUTPUT_RING_CH;
 
-    if (ring.input_active) {
-        fds_usb_completion = fds_in_completion;
-    }
-    else {
-        fds_usb_completion = fds_noop_completion;
-    }
+    fds_usb_completion = fds_completions[ring.active];
 }
 
 void fds_input_init(void) {
     usb_enable_ep(INPUT_EP, USB_EP_TYPE_ISOCHRONOUS, USB_EP2_SIZE);
 
-    ring.input_active = true;
+    ring.active |= INPUT_RING_CH;
 
-    if (ring.output_active) {
-        fds_usb_completion = fds_inout_completion;
-    }
-    else {
-        fds_usb_completion = fds_in_completion;
-    }
+    fds_usb_completion = fds_completions[ring.active];
 }
 
 void fds_input_disable(void) {
-    led_on = 0;
-
-    int i;
-
     usb_disable_ep(INPUT_EP);
 
-    ring.input_available = 0;
+    ring.hot &= ~INPUT_RING_CH;
+    ring.active &= ~INPUT_RING_CH;
 
-    ring.input_hot = false;
-    ring.input_active = false;
-    ring.input_stalled = false;
-
-    for (i = 0; i < RING_SIZE; i++) {
-        ring.item_ready[i] = false;
-    }
-
-    if (ring.output_active) {
-        fds_usb_completion = fds_out_completion;
-    }
-    else {
-        fds_usb_completion = fds_noop_completion;
-    }
+    fds_usb_completion = fds_completions[ring.active];
 }
 
 enum FDSInterface {
@@ -362,7 +290,7 @@ enum FDSAltSetting {
 bool usb_cb_set_interface(uint16_t interface, uint16_t altsetting) {
     if (interface == FDSInterface_Output) {
         if (altsetting == FDSAltSetting_On) {
-            if (ring.output_active) {
+            if (ring.active & OUTPUT_RING_CH) {
                 fds_output_disable();
             }
             fds_output_init();
@@ -373,7 +301,7 @@ bool usb_cb_set_interface(uint16_t interface, uint16_t altsetting) {
     }
     else if (interface == FDSInterface_Input) {
         if (altsetting == FDSAltSetting_On) {
-            if (ring.input_active) {
+            if (ring.active & INPUT_RING_CH) {
                 fds_input_disable();
             }
             fds_input_init();
@@ -501,7 +429,12 @@ int main() {
 
     init();
 
-    fds_usb_completion = fds_noop_completion;
+    fds_completions[0] = fds_noop_completion;
+    fds_completions[1] = fds_out_completion;
+    fds_completions[2] = fds_in_completion;
+    fds_completions[3] = fds_inout_completion;
+
+    fds_usb_completion = fds_completions[ring.active];
 
     // memset(&ring, 0, sizeof(ring));
 
@@ -603,7 +536,7 @@ int main() {
     // led_on = !led_on;
     // pin_set(LED_PIN, false);
 
-    while (1) { __NOP(); }
+    while (1) { __WFI(); }
 
     // while (1) {
     //     led_on = !led_on;
@@ -665,5 +598,5 @@ void TCC0_Handler(void) {
 void usb_cb_sof(void) {
     tick += 1;
 
-    fds_usb_completion((ring.output_hot ? (1 << 1) : 0) | (ring.input_hot ? (1 << 2) : 0));
+    fds_usb_completion(ring.hot);
 }
