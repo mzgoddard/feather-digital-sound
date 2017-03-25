@@ -11,6 +11,8 @@
 #include <io.h>
 #include "samd/usb_samd.h"
 
+#include "hw.h"
+
 #define USB_DEVICE_EPINTFLAG_TRCPT0_Pos 0            /**< \brief (USB_DEVICE_EPINTFLAG) Transfer Complete 0 */
 #define USB_DEVICE_EPINTFLAG_TRCPT0 (1 << USB_DEVICE_EPINTFLAG_TRCPT0_Pos)
 #define USB_DEVICE_EPINTFLAG_TRCPT1_Pos 1            /**< \brief (USB_DEVICE_EPINTFLAG) Transfer Complete 1 */
@@ -23,6 +25,9 @@
 #define USB_EP2_SIZE AUDIO_STREAM_EPSIZE
 
 uint32_t led_on;
+uint32_t is_loopback;
+uint32_t is_local;
+uint32_t is_remote;
 
 volatile uint8_t USB_DeviceState;
 volatile uint8_t USB_Device_ConfigurationNumber;
@@ -380,80 +385,6 @@ bool usb_cb_set_interface(uint16_t interface, uint16_t altsetting) {
     return true;
 }
 
-inline static void pin_mux(uint8_t p, uint8_t mux) {
-  if (p & 1) {
-    PORT->Group[p / 32].PMUX[(p % 32) / 2].bit.PMUXO = mux;
-  } else {
-    PORT->Group[p / 32].PMUX[(p % 32) / 2].bit.PMUXE = mux;
-  }
-
-  PORT->Group[p / 32].PINCFG[p % 32].bit.PMUXEN = 1;
-}
-
-inline static void pin_gpio(uint8_t p) {
-  PORT->Group[p / 32].PINCFG[p % 32].bit.PMUXEN = 0;
-}
-
-inline static void pin_out(uint8_t p) {
-  pin_gpio(p);
-  PORT->Group[p / 32].DIRSET.reg = (1<<(p % 32));
-}
-
-inline static void pin_dir(uint8_t p, bool out) {
-  if (out) {
-    PORT->Group[p / 32].DIRSET.reg = (1<<(p % 32));
-  } else {
-    PORT->Group[p / 32].DIRCLR.reg = (1<<(p % 32));
-  }
-}
-
-inline static void pin_high(uint8_t p) {
-  PORT->Group[p / 32].OUTSET.reg = (1<<(p % 32));
-}
-
-inline static void pin_low(uint8_t p) {
-  PORT->Group[p / 32].OUTCLR.reg = (1<<(p % 32));
-}
-
-inline static void pin_toggle(uint8_t p) {
-  PORT->Group[p / 32].OUTTGL.reg = (1<<(p % 32));
-}
-
-inline static void pin_set(uint8_t p, bool high) {
-  if (high) {
-    PORT->Group[p / 32].OUTSET.reg = (1<<(p % 32));
-  } else {
-    PORT->Group[p / 32].OUTCLR.reg = (1<<(p % 32));
-  }
-}
-
-inline static void pin_in(uint8_t p) {
-  pin_gpio(p);
-  PORT->Group[p / 32].PINCFG[(p % 32)].bit.INEN = 1;
-  PORT->Group[p / 32].DIRCLR.reg = (1<<(p % 32));
-}
-
-inline static void pin_pull_up(uint8_t p) {
-  pin_in(p);
-  PORT->Group[p / 32].PINCFG[(p % 32)].bit.PULLEN = 1;
-  pin_high(p);
-}
-
-inline static void pin_pull_down(uint8_t p) {
-  pin_in(p);
-  PORT->Group[p / 32].PINCFG[(p % 32)].bit.PULLEN = 1;
-  pin_low(p);
-}
-
-inline static void pin_float(uint8_t p) {
-  pin_in(p);
-  PORT->Group[p / 32].PINCFG[(p % 32)].bit.PULLEN = 0;
-}
-
-inline static bool pin_read(uint8_t p) {
-  return (PORT->Group[p / 32].IN.reg & (1<<(p % 32))) != 0;
-}
-
 typedef uint8_t u8;
 
 #define NVM_DFLL_COARSE_POS    58
@@ -547,6 +478,24 @@ void clock_init_crystal(u8 clk_system, u8 clk_32k) {
 #define PIN_USB_DP 25
 #define LED_PIN 17
 
+#define SPI_GCLK 3
+#define SPI_DMA_TX 4
+#define SPI_DMA_RX 5
+#define SPI_SERCOM 4
+#define SPI_DIPO 0
+#define SPI_DOPO 2
+#define SPI_CPOL 0
+#define SPI_CPHA 0
+#define SPI_BAUD 0
+#define PIN_SPI_SCK 42
+#define PIN_SPI_MOSI 41
+#define PIN_SPI_MISO 12
+
+#define SPI_EIC_REMOTE_READY EIC_INTFLAG_EXTINT2
+#define PIN_SPI_LOOPBACK_JUMPER 2
+#define PIN_SPI_LOCAL_JUMPER 39
+#define PIN_SPI_REMOTE_READY 18
+
 int main() {
     clock_init_crystal(GCLK_SYSTEM, GCLK_32K);
 
@@ -609,6 +558,46 @@ int main() {
     __DMB();
     __enable_irq();
 
+    dma_init();
+    NVIC_EnableIRQ(DMAC_IRQn);
+    NVIC_SetPriority(DMAC_IRQn, 0xff);
+
+    eic_init();
+    NVIC_EnableIRQ(EIC_IRQn);
+    NVIC_SetPriority(EIC_IRQn, 0xff);
+
+    pin_in(PIN_SPI_LOOPBACK_JUMPER);
+    is_loopback = pin_read(PIN_SPI_LOOPBACK_JUMPER);
+
+    pin_in(PIN_SPI_LOCAL_JUMPER);
+    is_local = pin_read(PIN_SPI_LOCAL_JUMPER);
+    is_remote = !is_local && !is_loopback;
+
+    if (is_local) {
+        pin_in(PIN_SPI_REMOTE_READY);
+        pin_mux_eic(PIN_SPI_REMOTE_READY);
+        eic_config(PIN_SPI_REMOTE_READY, EIC_CONFIG_SENSE_RISE);
+    }
+
+    // set up clock in case we need to use a divider
+    sercom_clock_enable(SPI_SERCOM, SPI_GCLK, 1);
+
+    if (is_local) {
+        sercom_spi_master_init(SPI_SERCOM, SPI_DIPO, SPI_DOPO,
+            SPI_CPOL, SPI_CPHA, SPI_BAUD);
+    }
+    else if (is_remote) {
+        sercom_spi_slave_init(SPI_SERCOM, SPI_DIPO, SPI_DOPO,
+            SPI_CPOL, SPI_CPHA);
+    }
+
+    dma_sercom_configure_tx(SPI_DMA_TX, SPI_SERCOM);
+    dma_sercom_configure_rx(SPI_DMA_RX, SPI_SERCOM);
+    dma_enable_interrupt(SPI_DMA_RX);
+    pin_mux(PIN_SPI_MOSI);
+    pin_mux(PIN_SPI_MISO);
+    pin_mux(PIN_SPI_SCK);
+
     // NVIC_SetPriority(USB_IRQn, 0xff);
 
     // led_on = !led_on;
@@ -625,6 +614,44 @@ int main() {
     // }
 
     return 0;
+}
+
+void spi_dma_completion(void) {
+    
+}
+
+void spi_start(void) {
+    uint32_t size = 0;
+    dma_sercom_start_rx(SPI_DMA_RX, SPI_SERCOM, NULL, size);
+    dma_sercom_start_tx(SPI_DMA_TX, SPI_SERCOM, NULL, size);
+}
+
+void spi_remote_ready(void) {
+    
+}
+
+void DMAC_Handler(void) {
+    u32 intpend = DMAC->INTPEND.reg;
+    if (intpend & DMAC_INTPEND_TCMPL) {
+        u32 id = intpend & DMAC_INTPEND_ID_Msk;
+
+        if (id == SPI_DMA_RX) {
+            spi_dma_completion();
+        }
+    }
+
+    if (intpend & (DMAC_INTPEND_TERR | DMAC_INTPEND_SUSP)) {
+        // invalid();
+    }
+
+    DMAC->INTPEND.reg = intpend;
+}
+
+void EIC_Handler(void) {
+    u32 flags = EIC->INTFLAG.reg;
+    if (flags &  SPI_EIC_REMOTE_READY) {
+        spi_remote_ready();
+    }
 }
 
 void TCC0_Handler(void) {
