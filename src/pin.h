@@ -3,6 +3,10 @@
 #include <parts.h>
 #include <io.h>
 
+typedef uint8_t u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+
 inline static void pin_mux(uint8_t p, uint8_t mux) {
   if (p & 1) {
     PORT->Group[p / 32].PMUX[(p % 32) / 2].bit.PMUXO = mux;
@@ -77,7 +81,7 @@ inline static bool pin_read(uint8_t p) {
   return (PORT->Group[p / 32].IN.reg & (1<<(p % 32))) != 0;
 }
 
-inline static void pin_mux_eic(Pin p) {
+inline static void pin_mux_eic(uint8_t p) {
     if ((p % 32) & 1) {
       PORT->Group[p / 32].PMUX[(p % 32)/2].bit.PMUXO = 0;
     } else {

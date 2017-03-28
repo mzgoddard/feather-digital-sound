@@ -32,10 +32,16 @@ void sercom_spi_slave_init(SercomId id, u32 dipo, u32 dopo, bool cpol, bool cpha
     sercom(id)->SPI.CTRLA.reg
       = SERCOM_SPI_CTRLA_ENABLE
       | SERCOM_SPI_CTRLA_MODE_SPI_SLAVE
+      | SERCOM_SPI_CTRLA_RUNSTDBY
+      | SERCOM_SPI_CTRLA_DORD
       | SERCOM_SPI_CTRLA_DIPO(dipo)
       | SERCOM_SPI_CTRLA_DOPO(dopo)
       | (cpol ? SERCOM_SPI_CTRLA_CPOL : 0)
       | (cpha ? SERCOM_SPI_CTRLA_CPHA : 0);
+
+    sercom(id)->SPI.INTENSET.reg = SERCOM_SPI_INTENSET_SSL;
+
+    while (sercom(id)->SPI.SYNCBUSY.reg > 0);
 }
 
 void sercom_spi_master_init(SercomId id, u32 dipo, u32 dopo, bool cpol, bool cpha, u8 baud) {
@@ -51,11 +57,14 @@ void sercom_spi_master_init(SercomId id, u32 dipo, u32 dopo, bool cpol, bool cph
     sercom(id)->SPI.CTRLA.reg
       = SERCOM_SPI_CTRLA_ENABLE
       | SERCOM_SPI_CTRLA_MODE_SPI_MASTER
+      | SERCOM_SPI_CTRLA_RUNSTDBY
+      | SERCOM_SPI_CTRLA_DORD
       | SERCOM_SPI_CTRLA_DIPO(dipo)
       | SERCOM_SPI_CTRLA_DOPO(dopo)
       | (cpol ? SERCOM_SPI_CTRLA_CPOL : 0)
       | (cpha ? SERCOM_SPI_CTRLA_CPHA : 0);
 
+    while (sercom(id)->SPI.SYNCBUSY.reg > 0);
 }
 
 void sercom_i2c_master_init(SercomId id, u8 baud) {

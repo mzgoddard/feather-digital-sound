@@ -70,7 +70,7 @@ __attribute__((__aligned__(4))) const USB_Configuration ConfigurationDescriptor 
                              sizeof(USB_AudioInputTerminal) +
                              sizeof(USB_AudioOutputTerminal)),
             .bInCollection = 2,
-            .bInterfaceNumbers = {1, 2},
+            .bInterfaceNumbers = {2, 1},
 		},
 
 	.Output_InputTerminal =
