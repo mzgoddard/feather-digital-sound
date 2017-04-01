@@ -99,10 +99,10 @@ uint32_t is_remote;
 #define SPI_GCLK 3
 #define SPI_DMA_TX 4
 #define SPI_DMA_RX 5
-#define SPI_MDIPO 2
-#define SPI_MDOPO 3
-#define SPI_SDIPO 3
-#define SPI_SDOPO 0
+#define SPI_MDIPO 0
+#define SPI_MDOPO 1
+#define SPI_SDIPO 2
+#define SPI_SDOPO 3
 #define SPI_CPOL 1
 #define SPI_CPHA 0
 #define SPI_BAUD 5
@@ -113,19 +113,19 @@ uint32_t is_remote;
 #define SPI_SERCOM 4
 #define PIN_SPI_SCK FEATHER_SCK /* 43 */
 #define PIN_SPI_MOSI FEATHER_MOSI /* 42 */
-#define PIN_SPI_MISO FEATHER_A1 /* 12 */
+#define PIN_SPI_MISO FEATHER_MISO /* 12 */
 #define PIN_SPI_SS FEATHER_A2 /* 41 */
 #define PIN_SPI_SCK_MUX MUX_PB11D_SERCOM4_PAD3
 #define PIN_SPI_MOSI_MUX MUX_PB10D_SERCOM4_PAD2
-#define PIN_SPI_MISO_MUX MUX_PB08D_SERCOM4_PAD0
+#define PIN_SPI_MISO_MUX MUX_PA12D_SERCOM4_PAD0
 #define PIN_SPI_SS_MUX MUX_PB09D_SERCOM4_PAD1
 
 #define PIN_SPI_SEN FEATHER_D12
 
-#define SPI_EIC_REMOTE_READY EIC_INTFLAG_EXTINT0
-#define SPI_EIC_INTENSET_REMOTE_READY EIC_INTENSET_EXTINT0
-#define PIN_SPI_REMOTE_READY FEATHER_D11 /* 16 */
-#define PIN_SPI_REMOVE_READY_EIC_MUX MUX_PA16A_EIC_EXTINT0
+#define SPI_EIC_REMOTE_READY EIC_INTFLAG_EXTINT2
+#define SPI_EIC_INTENSET_REMOTE_READY EIC_INTENSET_EXTINT2
+#define PIN_SPI_REMOTE_READY FEATHER_D10 /* 18 */
+#define PIN_SPI_REMOVE_READY_EIC_MUX MUX_PA16A_EIC_EXTINT2
 
 // #define SPI_SERCOM 1
 // #define PIN_SPI_SCK FEATHER_D12 /* 19 */
@@ -1068,13 +1068,12 @@ void TCC0_Handler(void) {
 }
 
 void usb_cb_sof(void) {
-    sof_tick += 1;
-
     if (is_remote) {
         pin_low(PIN_SPI_REMOTE_READY);
     }
     fds_usb_completion(ring.hot);
 
+    sof_tick += 1;
     if (!is_loopback && sof_tick > 10) {
         memset(ring_items, 0, sizeof(ring_items));
         sof_tick = 0;
