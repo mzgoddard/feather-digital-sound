@@ -12,6 +12,7 @@
 #include "samd/usb_samd.h"
 
 #include "hw.h"
+#include "stream.h"
 
 #define USB_DEVICE_EPINTFLAG_TRCPT0_Pos 0            /**< \brief (USB_DEVICE_EPINTFLAG) Transfer Complete 0 */
 #define USB_DEVICE_EPINTFLAG_TRCPT0 (1 << USB_DEVICE_EPINTFLAG_TRCPT0_Pos)
@@ -105,7 +106,7 @@ uint32_t is_remote;
 #define SPI_SDOPO 3
 #define SPI_CPOL 1
 #define SPI_CPHA 0
-#define SPI_BAUD 5
+#define SPI_BAUD 3
 
 #define PIN_SPI_LOOPBACK_JUMPER 40
 #define PIN_SPI_LOCAL_JUMPER FEATHER_A0
@@ -152,6 +153,10 @@ USB_ENDPOINTS(3);
 uint32_t tick = 0;
 USB_ALIGN uint8_t output_buffer[MS_BUFFER_SIZE];
 USB_ALIGN uint8_t input_buffer[MS_BUFFER_SIZE];
+
+struct stream_queue output_stream;
+struct stream_queue input_stream;
+
 typedef struct {
     // bool ready;
     USB_ALIGN uint8_t buffer[MS_BUFFER_SIZE];
@@ -314,62 +319,58 @@ void fds_in_completion(uint32_t summary) {
     }
 }
 
+void fds_prepare_remote_spi(void) {
+    pin_low(PIN_SPI_REMOTE_READY);
+
+    sercom_spi_slave_init(SPI_SERCOM, SPI_SDIPO, SPI_SDOPO,
+        SPI_CPOL, SPI_CPHA);
+    sercom(SPI_SERCOM)->SPI.INTENSET.bit.SSL = 1;
+
+    stream_dequeue_prep_begin(&output_stream);
+    stream_enqueue_prep_begin(&input_stream);
+
+    sercom(SPI_SERCOM)->SPI.DATA.reg = stream_dequeue_exec_begin(&output_stream)->buffer[MS_BUFFER_LENGTH - 1];
+
+    dma_sercom_start_rx(SPI_DMA_RX, SPI_SERCOM, stream_enqueue_exec_begin(&input_stream)->buffer, MS_BUFFER_LENGTH);
+    dma_sercom_start_tx(SPI_DMA_TX, SPI_SERCOM, stream_dequeue_exec_begin(&output_stream)->buffer, MS_BUFFER_LENGTH);
+
+    pin_high(PIN_SPI_REMOTE_READY);
+}
+
 static inline void fds_local_start_inout() {
     uint8_t index = ring.index;
     ring.index = ring.index + 1 & RING_MASK;
-    usb_ep_start_out(OUTPUT_EP, ring_items[ring.index].buffer, MS_BUFFER_LENGTH);
-    usb_ep_start_in(INPUT_EP, ring_items[ring.index + 2].buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
-
-    if (is_remote) {
-        // memcpy(output_buffer, ring_items[index].buffer, MS_BUFFER_LENGTH);
-        // memcpy(ring_items[index].buffer, ring_items[index].buffer + 4, 4);
-
-        // pin_pull_down(PIN_SPI_SS);
-        // pin_mux(PIN_SPI_SS, PIN_SPI_SS_MUX);
-        // pin_low(PIN_SPI_SS);
-
-        sercom_spi_slave_init(SPI_SERCOM, SPI_SDIPO, SPI_SDOPO,
-            SPI_CPOL, SPI_CPHA);
-        SERCOM4->SPI.INTENSET.bit.SSL = 1;
-        // sercom(SPI_SERCOM)->SPI.INTENSET.bit.TXC = 1;
-
-        sercom(SPI_SERCOM)->SPI.DATA.reg = ring_items[index].buffer[MS_BUFFER_LENGTH - 1];
-
-        // dma_sercom_start_rx(SPI_DMA_RX, SPI_SERCOM, ring_items[index + 2].buffer, MS_BUFFER_LENGTH);
-        // dma_sercom_start_tx(SPI_DMA_TX, SPI_SERCOM, ring_items[ring.index].buffer, MS_BUFFER_LENGTH);
-
-        pin_high(PIN_SPI_REMOTE_READY);
-    }
-    else {
-        // pin_low(PIN_SPI_SS);
-    }
+    usb_ep_start_out(OUTPUT_EP, stream_enqueue_begin(&output_stream)->buffer, MS_BUFFER_LENGTH);
+    usb_ep_start_in(INPUT_EP, stream_dequeue_begin(&input_stream)->buffer, MS_BUFFER_LENGTH, MS_BUFFER_ZLP);
 }
 
 void fds_local_inout_completion(uint32_t summary) {
-    if (summary & (OUTPUT_RING_CH | INPUT_RING_CH)) {
-        fds_local_start_inout();
-    }
-    else if (summary & OUTPUT_RING_CH) {
-        if (ring.hot & INPUT_RING_CH == 0x00) {
-            ring.hot |= INPUT_RING_CH;
-            fds_local_start_inout();
-        }
-        else {
-            ring.hot &= ~OUTPUT_RING_CH;
-        }
-    }
-    else if (summary & INPUT_RING_CH) {
-        if (ring.hot & OUTPUT_RING_CH == 0x00) {
-            ring.hot |= OUTPUT_RING_CH;
-            fds_local_start_inout();
-        }
-    }
-    else {
-        if (ring.hot & (OUTPUT_RING_CH | INPUT_RING_CH) == 0x00) {
-            ring.hot |= (OUTPUT_RING_CH | INPUT_RING_CH);
-            fds_local_start_inout();
-        }
-    }
+    ring.hot |= (OUTPUT_RING_CH | INPUT_RING_CH);
+    fds_local_start_inout();
+    // if (summary & (OUTPUT_RING_CH | INPUT_RING_CH)) {
+    //     fds_local_start_inout();
+    // }
+    // else if (summary & OUTPUT_RING_CH) {
+    //     if (ring.hot & INPUT_RING_CH == 0x00) {
+    //         ring.hot |= INPUT_RING_CH;
+    //         fds_local_start_inout();
+    //     }
+    //     else {
+    //         ring.hot &= ~OUTPUT_RING_CH;
+    //     }
+    // }
+    // else if (summary & INPUT_RING_CH) {
+    //     if (ring.hot & OUTPUT_RING_CH == 0x00) {
+    //         ring.hot |= OUTPUT_RING_CH;
+    //         fds_local_start_inout();
+    //     }
+    // }
+    // else {
+    //     if (ring.hot & (OUTPUT_RING_CH | INPUT_RING_CH) == 0x00) {
+    //         ring.hot |= (OUTPUT_RING_CH | INPUT_RING_CH);
+    //         fds_local_start_inout();
+    //     }
+    // }
 }
 void fds_local_out_completion(uint32_t summary) {
     ring.hot &= ~summary;
@@ -488,6 +489,28 @@ fds_completion_handle fds_completions[8];
 
 /// Callback on a completion interrupt
 void usb_cb_completion(uint32_t summary) {
+	if (usb_ep_pending(OUTPUT_EP)) {
+		usb_ep_handled(OUTPUT_EP);
+        ring.hot &= ~OUTPUT_RING_CH;
+        stream_enqueue_end(&output_stream);
+	}
+
+	if (usb_ep_pending(INPUT_EP)) {
+		usb_ep_handled(INPUT_EP);
+		ring.hot &= ~INPUT_RING_CH;
+        stream_dequeue_end(&input_stream);
+	}
+
+    if (!ring.hot && is_remote) {
+        fds_prepare_remote_spi();
+    }
+
+    if (!ring.hot) {
+        if (is_remote) {
+            pin_low(PIN_SPI_REMOTE_READY);
+        }
+        fds_usb_completion(ring.hot);
+    }
 }
 void usb_cb_control_in_completion(void) {
 }
@@ -688,6 +711,10 @@ int main() {
 
     init();
 
+    stream_queue_init_module();
+    stream_queue_init(&output_stream);
+    stream_queue_init(&input_stream);
+
     fds_completions[0] = fds_noop_completion;
     fds_completions[1] = fds_out_completion;
     fds_completions[2] = fds_in_completion;
@@ -866,6 +893,11 @@ void spi_dma_completion(void) {
     dma_tick += 1;
     sof_tick = 0;
 
+    // uint8_t *buffer = stream_enqueue_begin(&input_stream)->buffer;
+
+    stream_dequeue_end(&output_stream);
+    stream_enqueue_end(&input_stream);
+
     if (is_remote) {
         // led_on = 1;
     //     pin_low(PIN_SPI_REMOTE_READY);
@@ -942,8 +974,8 @@ void spi_remote_ready(void) {
         pin_low(PIN_SPI_SEN);
 
         uint8_t index = ring.index + 1 & RING_MASK;
-        dma_sercom_start_rx(SPI_DMA_RX, SPI_SERCOM, ring_items[index + 2].buffer, MS_BUFFER_LENGTH);
-        dma_sercom_start_tx(SPI_DMA_TX, SPI_SERCOM, ring_items[index].buffer, MS_BUFFER_LENGTH);
+        dma_sercom_start_rx(SPI_DMA_RX, SPI_SERCOM, stream_enqueue_begin(&input_stream)->buffer, MS_BUFFER_LENGTH);
+        dma_sercom_start_tx(SPI_DMA_TX, SPI_SERCOM, stream_dequeue_begin(&output_stream)->buffer, MS_BUFFER_LENGTH);
     }
     else if (ring.active & (OUTPUT_RING_CH)) {
         sercom_spi_master_init(SPI_SERCOM, SPI_MDIPO, SPI_MDOPO,
@@ -1026,8 +1058,8 @@ void SERCOM4_Handler(void) {
         if (flags & SERCOM_SPI_INTFLAG_SSL) {
             uint8_t index = ring.index + 1 & RING_MASK;
             if (ring.active & (OUTPUT_RING_CH | INPUT_RING_CH)) {
-                dma_sercom_start_rx(SPI_DMA_RX, SPI_SERCOM, ring_items[index + 2].buffer, MS_BUFFER_LENGTH);
-                dma_sercom_start_tx(SPI_DMA_TX, SPI_SERCOM, ring_items[ring.index].buffer, MS_BUFFER_LENGTH);
+                // dma_sercom_start_rx(SPI_DMA_RX, SPI_SERCOM, stream_enqueue_exec_begin(&input_stream)->buffer, MS_BUFFER_LENGTH);
+                // dma_sercom_start_tx(SPI_DMA_TX, SPI_SERCOM, output_stream.tail_item->buffer, MS_BUFFER_LENGTH);
                 ring_index = index;
                 tx_index = MS_BUFFER_LENGTH - 1;
             }
@@ -1068,14 +1100,15 @@ void TCC0_Handler(void) {
 }
 
 void usb_cb_sof(void) {
-    if (is_remote) {
-        pin_low(PIN_SPI_REMOTE_READY);
-    }
-    fds_usb_completion(ring.hot);
+    // if (is_remote) {
+    //     pin_low(PIN_SPI_REMOTE_READY);
+    // }
+    // fds_usb_completion(ring.hot);
 
     sof_tick += 1;
     if (!is_loopback && sof_tick > 10) {
         memset(ring_items, 0, sizeof(ring_items));
         sof_tick = 0;
+        fds_usb_completion(0);
     }
 }
