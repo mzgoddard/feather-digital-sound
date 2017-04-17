@@ -30,6 +30,11 @@ uint32_t is_loopback;
 uint32_t is_local;
 uint32_t is_remote;
 
+uint32_t sof_tick = 0;
+uint32_t dma_tick = 0;
+
+bool slave_to_master = false;
+
 #define MODE_ID (is_loopback ? 0 : 1)
 #define MODE_SHIFT (is_loopback ? 0 : 4)
 #define MODE_COMPLETION(active) (active + MODE_SHIFT)
@@ -325,16 +330,55 @@ void fds_prepare_remote_spi(void) {
     sercom_spi_slave_init(SPI_SERCOM, SPI_SDIPO, SPI_SDOPO,
         SPI_CPOL, SPI_CPHA);
     sercom(SPI_SERCOM)->SPI.INTENSET.bit.SSL = 1;
+    // sercom(SPI_SERCOM)->SPI.INTENSET.bit.DRE = 1;
+    // sercom(SPI_SERCOM)->SPI.INTENSET.bit.RXC = 1;
 
-    stream_dequeue_prep_begin(&output_stream);
+    // stream_dequeue_prep_begin(&output_stream);
     stream_enqueue_prep_begin(&input_stream);
+
+    // // led_on += 1;
+    // pin_set(LED_PIN, led_on % 1000 == 1);
+    pin_high(PIN_SPI_REMOTE_READY);
 
     sercom(SPI_SERCOM)->SPI.DATA.reg = stream_dequeue_exec_begin(&output_stream)->buffer[MS_BUFFER_LENGTH - 1];
 
     dma_sercom_start_rx(SPI_DMA_RX, SPI_SERCOM, stream_enqueue_exec_begin(&input_stream)->buffer, MS_BUFFER_LENGTH);
-    dma_sercom_start_tx(SPI_DMA_TX, SPI_SERCOM, stream_dequeue_exec_begin(&output_stream)->buffer, MS_BUFFER_LENGTH);
+    dma_sercom_start_tx(SPI_DMA_TX, SPI_SERCOM, NULL, MS_BUFFER_LENGTH);
 
-    pin_high(PIN_SPI_REMOTE_READY);
+    // if (sercom(SPI_SERCOM)->SPI.INTFLAG.reg & SERCOM_SPI_INTFLAG_TXC) {
+    //     sercom(SPI_SERCOM)->SPI.INTFLAG.reg |= SERCOM_SPI_INTFLAG_TXC;
+    // }
+    //
+    // for (int i = MS_BUFFER_LENGTH - 1; i >= 0; i--) {
+    //     // ready to write?
+    //     while (!(sercom(SPI_SERCOM)->SPI.INTFLAG.reg & SERCOM_SPI_INTFLAG_DRE));
+    //     // sercom(SPI_SERCOM)->SPI.INTFLAG.reg &= ~SERCOM_SPI_INTFLAG_DRE;
+    //
+    //     if (sercom(SPI_SERCOM)->SPI.INTFLAG.reg & SERCOM_SPI_INTFLAG_TXC) {
+    //         sercom(SPI_SERCOM)->SPI.INTFLAG.reg |= SERCOM_SPI_INTFLAG_TXC;
+    //     }
+    //
+    //     // write
+    //     sercom(SPI_SERCOM)->SPI.DATA.reg = stream_dequeue_exec_begin(&output_stream)->buffer[i] & SERCOM_SPI_DATA_MASK;
+    //
+    //     // ready to read?
+    //     while (!(sercom(SPI_SERCOM)->SPI.INTFLAG.reg & SERCOM_SPI_INTFLAG_RXC));
+    //     // sercom(SPI_SERCOM)->SPI.INTFLAG.reg |= SERCOM_SPI_INTFLAG_RXC;
+    //
+    //     // read
+    //     stream_enqueue_exec_begin(&input_stream)->buffer[i] = (uint8_t)sercom(SPI_SERCOM)->SPI.DATA.reg;
+    // }
+    //
+    // // led_on = 0;
+    // led_on += 1;
+    // pin_set(LED_PIN, led_on % 1000 == 1);
+    // pin_low(PIN_SPI_REMOTE_READY);
+    //
+    // dma_tick += 1;
+    // sof_tick = 0;
+    //
+    // stream_dequeue_end(&output_stream);
+    // stream_enqueue_end(&input_stream);
 }
 
 static inline void fds_local_start_inout() {
@@ -804,27 +848,19 @@ int main() {
     __enable_irq();
 
     if (!is_loopback) {
-        NVIC_EnableIRQ(SERCOM4_IRQn);
-        NVIC_SetPriority(SERCOM4_IRQn, 1);
+        // if (is_local) {
+            NVIC_EnableIRQ(SERCOM4_IRQn);
+            NVIC_SetPriority(SERCOM4_IRQn, 1);
+        // }
 
         // set up clock in case we need to use a divider
         sercom_clock_enable(SPI_SERCOM, GCLK_SYSTEM, 1);
 
-        dma_sercom_configure_tx(SPI_DMA_TX, SPI_SERCOM);
         // if (is_local) {
-        //     DMAC->CHCTRLB.reg = DMAC_CHCTRLB_LVL_LVL1 | DMAC_CHCTRLB_TRIGACT_BEAT | DMAC_CHCTRLB_TRIGSRC(SPI_SERCOM * 2 + 2);
+            dma_sercom_configure_tx(SPI_DMA_TX, SPI_SERCOM);
+            dma_sercom_configure_rx(SPI_DMA_RX, SPI_SERCOM);
         // }
-        // if (is_remote) {
-        //     DMAC->CHCTRLB.reg = DMAC_CHCTRLB_LVL_LVL1 | DMAC_CHCTRLB_TRIGACT_BEAT | DMAC_CHCTRLB_TRIGSRC(SPI_SERCOM * 2 + 1);
-        // }
-        dma_sercom_configure_rx(SPI_DMA_RX, SPI_SERCOM);
-        // if (is_local) {
-        //     DMAC->CHCTRLB.reg = DMAC_CHCTRLB_LVL_LVL0 | DMAC_CHCTRLB_TRIGACT_BEAT | DMAC_CHCTRLB_TRIGSRC(SPI_SERCOM * 2 + 1);
-        // }
-        // if (is_remote) {
-        //     DMAC->CHCTRLB.reg = DMAC_CHCTRLB_LVL_LVL0 | DMAC_CHCTRLB_TRIGACT_BEAT | DMAC_CHCTRLB_TRIGSRC(SPI_SERCOM * 2 + 1);
-        // }
-        // dma_enable_interrupt(SPI_DMA_TX);
+
         dma_enable_interrupt(SPI_DMA_RX);
 
         if (is_local) {
@@ -886,8 +922,8 @@ int main() {
     return 0;
 }
 
-uint32_t sof_tick = 0;
-uint32_t dma_tick = 0;
+// uint32_t sof_tick = 0;
+// uint32_t dma_tick = 0;
 
 void spi_dma_completion(void) {
     dma_tick += 1;
@@ -895,7 +931,9 @@ void spi_dma_completion(void) {
 
     // uint8_t *buffer = stream_enqueue_begin(&input_stream)->buffer;
 
-    stream_dequeue_end(&output_stream);
+    if (is_local) {
+        stream_dequeue_end(&output_stream);
+    }
     stream_enqueue_end(&input_stream);
 
     if (is_remote) {

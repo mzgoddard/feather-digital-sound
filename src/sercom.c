@@ -39,7 +39,7 @@ void sercom_spi_slave_init(SercomId id, u32 dipo, u32 dopo, bool cpol, bool cpha
       | (cpol ? SERCOM_SPI_CTRLA_CPOL : 0)
       | (cpha ? SERCOM_SPI_CTRLA_CPHA : 0);
 
-    sercom(id)->SPI.INTENSET.reg = SERCOM_SPI_INTENSET_SSL;
+    // sercom(id)->SPI.INTENSET.reg = SERCOM_SPI_INTENSET_SSL;
 
     while (sercom(id)->SPI.SYNCBUSY.reg > 0);
 }
